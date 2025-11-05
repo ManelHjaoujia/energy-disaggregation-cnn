@@ -1,121 +1,136 @@
-# Energy Disaggregation using CNN (Seq2Point)
+# ⚡ Multi-Output Energy Disaggregation using Seq2Point CNN
 
-This project implements a **Convolutional Neural Network (CNN)** based **Seq2Point** model for **Non-Intrusive Load Monitoring (NILM)** — the task of estimating the power consumption of individual household appliances from aggregate mains readings.
-
-The model learns to predict the power usage of a specific appliance at the midpoint of a sliding window of aggregate power data, allowing accurate disaggregation of energy consumption patterns.
+This project implements a **multi-output Seq2Point Convolutional Neural Network (CNN)** to perform **energy disaggregation**, also known as **Non-Intrusive Load Monitoring (NILM)**.  
+The goal is to estimate the individual power consumption of multiple household appliances using only the aggregate (total) power consumption signal.
 
 ---
 
 ## Project Overview
 
-Energy disaggregation (or **NILM**) aims to decompose the total power signal of a home into individual appliance-level signals without using extra sensors.  
-This project applies a **Seq2Point architecture**, inspired by the paper:
+In smart energy systems, understanding how much electricity each appliance consumes helps with energy efficiency, anomaly detection, and demand forecasting.  
+Traditional approaches require dedicated sensors for each appliance. This project instead uses **deep learning** to infer appliance-level data from aggregate consumption.
 
-> Kelly, J., & Knottenbelt, W. (2015). *Neural NILM: Deep neural networks applied to energy disaggregation.*  
-> Proceedings of the 2nd ACM International Conference on Embedded Systems for Energy-Efficient Built Environments.
-
-The network uses **1D Convolutional layers** to learn temporal patterns in energy consumption sequences.
+The proposed **Seq2Point CNN model** learns temporal patterns within a fixed-size time window of aggregate signals and predicts the corresponding appliance-level consumptions simultaneously.
 
 ---
 
 ## Model Architecture
 
-The Seq2Point model is built using **Keras** with the following layers:
+The model is a **1D Convolutional Neural Network** built using TensorFlow/Keras with the following key layers:
 
-- `Conv1D` × 5 : Extract temporal features from aggregate signals  
-- `Flatten` : Convert convolutional features into a dense vector  
-- `Dense` layers : Predict the midpoint power value of the appliance  
-- `Activation: ReLU` for non-linearity  
-- `Loss: Mean Squared Error (MSE)`  
-- `Optimizer: Adam`
+- `Conv1D` layers (filters: 16 → 32 → 64 → 128)  
+- `Flatten` layer  
+- `Dense(1024)` fully connected layer with ReLU activation  
+- `Dense(num_appliances)` output layer (multi-output regression)
 
-The model takes a sliding window of mains readings (length = 599 samples) and predicts the corresponding midpoint target value.
+Each output node corresponds to one household appliance.
+
+**Model Summary:**
+
+Total Parameters: 7,935,919                   
+Trainable Parameters: 7,935,919                      
+Non-trainable: 0                       
+
 
 ---
 
 ## Dataset
 
-The notebook uses data from the **REFIT dataset** (or any similar household energy dataset).  
-Each dataset includes:
-- `mains` readings (aggregate power consumption)
-- `appliance` readings (ground truth)
-
-Data is preprocessed by:
-1. Normalizing power values (0–1 scaling)
-2. Splitting data into **train** and **test sets**
-3. Creating overlapping windows using a sliding window generator
-
----
-
-## Requirements
-
-Install the dependencies listed below before running the notebook:
-
-```bash
-pip install -r requirements.txt
-```
-##  How to Run
-
-### Clone the repository:
-```bash
-git clone https://github.com/ManelHjaoujia/energy-disaggregation-cnn.git
-cd energy-disaggregation-cnn
-```
-### Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-### Open the notebook:
-```bash
-jupyter notebook Seq2point.ipynb
-```
-### Run all cells to:
-
-- Load and preprocess data  
-- Train the Seq2Point CNN model  
-- Evaluate model performance (MAE, RMSE, visualizations)
+- **Source:** `all_buildings_data.csv`
+- **Features:**  
+  - `aggregate`: total power consumption of the building  
+  - Multiple columns for individual appliance power readings
+- **Preprocessing Steps:**  
+  - Dropped unnecessary columns  
+  - Standardized both input and target values using `StandardScaler`  
+  - Created fixed-length sliding windows (`window_size = 60`)  
 
 ---
 
-## Results and Discussion
+## Training Setup
 
-The Seq2Point CNN model was trained for **50 epochs**, showing a clear improvement in performance over time.  
-The **training loss** and **mean absolute error (MAE)** decreased steadily, reaching around **0.10 loss** and **0.17 MAE** by epoch 29.  
-However, the **validation loss and MAE plateaued around 0.42 and 0.33**, suggesting that the model began to overfit after approximately 15–20 epochs.
+- **Model:** Seq2Point CNN  
+- **Loss Function:** Mean Squared Error (MSE)  
+- **Optimizer:** Adam  
+- **Metrics:** Mean Absolute Error (MAE)  
+- **Epochs:** 50  
+- **Batch Size:** 32  
+- **Validation Split:** 20%  
 
-Overall, the model demonstrates good learning capability and convergence on the training set, but limited generalization on the validation set.  
-This behavior is mainly due to:
-
-- Restricted computational resources and early stopping based on validation stagnation  
-- No extensive hyperparameter tuning (e.g., learning rate, batch size)  
-- Possible dataset imbalance or insufficient variability  
-
-Future experiments with **larger datasets, extended training, and stronger regularization** (e.g., dropout, batch normalization tuning) are expected to further improve validation performance and reduce overfitting.
-
+**Training Environment:**  
+Limited computational resources were available, so the model was trained for 50 epochs.  
+Although results are promising, extended training and hyperparameter tuning are expected to further improve performance.
 
 ---
 
-##  Future Improvements
+## Results
 
--  Increase epochs and use early stopping  
--  Implement GRU and LSTM models for comparison  
--  Add regularization and dropout layers  
--  Visualize learned filters and embeddings (t-SNE / PCA)  
--  Use larger datasets and additional appliances  
--  Integrate TensorBoard for monitoring training metrics  
+| Metric | Score |
+|:--------|:------|
+| **Mean Absolute Error (MAE)** | 0.3386 |
+| **Mean Squared Error (MSE)** | 0.4859 |
+| **R² Score** | 0.5245 |
+
+The model successfully learned to approximate appliance-level power usage patterns with moderate accuracy given the constraints.
 
 ---
 
-## References
+## Training Curves
 
-- Kelly, J., & Knottenbelt, W. (2015). *Neural NILM: Deep neural networks applied to energy disaggregation.*  
-- Makonin, S. et al. (2016). *REFIT: Electrical Load Measurements (2013–2015).*  
-- [Keras Documentation](https://keras.io)
+**Loss Over Epochs**
+```python
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+```
+
+**MAE Over Epochs**
+```python
+plt.plot(history.history['mae'], label='Training MAE')
+plt.plot(history.history['val_mae'], label='Validation MAE')
+```
+Both training and validation curves show stable convergence, indicating a well-generalized model.             
+
+---
+
+## Example Prediction
+
+An example inference on a 60-point aggregate window shows the predicted energy usage per appliance:
+
+| Appliance         | Predicted Consumption (kWh) |
+|-------------------|-----------------------------|
+| Laptop Computer   | 0.00                        |
+| Television        | 5.48                        |
+| HTPC              | 0.68                        |
+| Microwave         | 0.49                        |
+| Audio Amplifier   | 1.42                        |
+| Immersion Heater  | 0.57                        |
+| Fridge            | 3.33                        |
+| ...               | ...                         |
+
+---
+
+## Technologies Used
+
+- Python  
+- TensorFlow / Keras  
+- NumPy  
+- Pandas  
+- Matplotlib  
+- Scikit-learn  
+
+---
+
+## Future Improvements
+
+- Extend training epochs and fine-tune hyperparameters  
+- Implement dropout and batch normalization for regularization  
+- Integrate TensorBoard for live training monitoring  
+- Add visualization of appliance embeddings (t-SNE or PCA)  
+- Explore hybrid models (CNN-LSTM / Transformer-based NILM)  
 
 ---
 
 ## Author
 
 **Manel Hjaoujia**  
-Master’s student in Information Systems Engineering & Data Science
+Master’s Student in Information Systems Engineering & Data Science
